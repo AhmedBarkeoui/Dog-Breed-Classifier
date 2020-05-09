@@ -63,7 +63,11 @@ os.chdir("/content/gdrive/My Drive/THU/Dog")
 #!pip install tensorboardcolab
 ```
 
-    Drive already mounted at /content/gdrive; to attempt to forcibly remount, call drive.mount("/content/gdrive", force_remount=True).
+    Go to this URL in a browser: https://accounts.google.com/o/oauth2/auth?client_id=947318989803-6bn6qk8qdgf4n4g3pfee6491hc0brc4i.apps.googleusercontent.com&redirect_uri=urn%3aietf%3awg%3aoauth%3a2.0%3aoob&response_type=code&scope=email%20https%3a%2f%2fwww.googleapis.com%2fauth%2fdocs.test%20https%3a%2f%2fwww.googleapis.com%2fauth%2fdrive%20https%3a%2f%2fwww.googleapis.com%2fauth%2fdrive.photos.readonly%20https%3a%2f%2fwww.googleapis.com%2fauth%2fpeopleapi.readonly
+    
+    Enter your authorization code:
+    ··········
+    Mounted at /content/gdrive
     
 
 
@@ -159,9 +163,7 @@ __Question 1:__ Use the code cell below to test the performance of the `face_det
 Ideally, we would like 100% of human images with a detected face and 0% of dog images with a detected face.  You will see that our algorithm falls short of this goal, but still gives acceptable performance.  We extract the file paths for the first 100 images from each of the datasets and store them in the numpy arrays `human_files_short` and `dog_files_short`.
 
 __Answer:__ 
-Number of faces detected for humans: 0.99
-
-Number of faces detected for dogs: 0.10
+(You can print out your results and/or write your percentages in this cell)
 
 
 ```python
@@ -232,6 +234,16 @@ use_cuda = torch.cuda.is_available()
 if use_cuda:
     VGG16 = VGG16.cuda()
 ```
+
+    Downloading: "https://download.pytorch.org/models/vgg16-397923af.pth" to /root/.cache/torch/checkpoints/vgg16-397923af.pth
+    
+
+
+    HBox(children=(FloatProgress(value=0.0, max=553433881.0), HTML(value='')))
+
+
+    
+    
 
 
 ```python
@@ -344,10 +356,7 @@ Use these ideas to complete the `dog_detector` function below, which returns `Tr
 def dog_detector(img_path):
     ## TODO: Complete the function.
     index = VGG16_predict(img_path)
-    if (index >= 151 and index <= 268):
-        return True
-    else:
-        return False
+    return index >= 151 and index <= 268
 ```
 
 ### (IMPLEMENTATION) Assess the Dog Detector
@@ -357,11 +366,6 @@ __Question 2:__ Use the code cell below to test the performance of your `dog_det
 - What percentage of the images in `dog_files_short` have a detected dog?
 
 __Answer:__ 
-
-Number of dog detected for humans: 0%
-
-Number of dog detected for dogs: 0.95
-
 
 
 
@@ -538,47 +542,35 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
         ## Define layers of a CNN
-        # convolutional layer 
-        self.conv1 = nn.Conv2d(3, 16, 7, padding=1)
-        # convolutional layer 
-        self.conv2 = nn.Conv2d(16, 32, 5, padding=1)
-        # convolutional layer 
-        self.conv3 = nn.Conv2d(32, 64, 5, padding=1)
-        # convolutional layer 
-        self.conv4 = nn.Conv2d(64, 128, 5,padding=1)
+        self.conv1 = nn.Conv2d(3, 32, 3, stride=2, padding=1)
+        self.conv2 = nn.Conv2d(32, 64, 3, stride=2, padding=1)
+        self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
 
-        # max pooling layer
+        # pool
         self.pool = nn.MaxPool2d(2, 2)
-
-        # linear layer 
-        self.fc1 = nn.Linear(128*6*6, 1024) 
-        # linear layer 
-        self.fc2 = nn.Linear(1024, 133)
-        # dropout layer (p=0.5)
-        self.dropout = nn.Dropout(0.5)
-
-        self.avgpool =  nn.AvgPool2d(2,2)
+        
+        # fully-connected
+        self.fc1 = nn.Linear(7*7*128, 500)
+        self.fc2 = nn.Linear(500, 133) 
+        
+        # drop-out
+        self.dropout = nn.Dropout(0.3)
     
     def forward(self, x):
         ## Define forward behavior
-        # add sequence of convolutional and max pooling layers
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = self.pool(F.relu(self.conv3(x)))
-        x = self.pool(F.relu(self.conv4(x)))
-
-        x = self.avgpool(x)
-        x = self.dropout(x)
-        #print(x.shape) # to know the input size of the linear layer it outputs 64, 28, 28 in this case
+        x = F.relu(self.conv1(x))
+        x = self.pool(x)
+        x = F.relu(self.conv2(x))
+        x = self.pool(x)
+        x = F.relu(self.conv3(x))
+        x = self.pool(x)
         
-        # flatten image input
-        x = x.view(x.size(0), -1)
-        #x = x.view(-1, 128*6*6)
-        # add dropout layer
+        # flatten
+        x = x.view(-1, 7*7*128)
+        
         x = self.dropout(x)
-        # add 1st hidden layer, with relu activation function
         x = F.relu(self.fc1(x))
-        # add dropout layer
+        
         x = self.dropout(x)
         x = self.fc2(x)
         return x
@@ -594,16 +586,7 @@ if use_cuda:
 
 __Question 4:__ Outline the steps you took to get to your final CNN architecture and your reasoning at each step.  
 
-__Answer:__ I used 4 conv layers:
-
-1. 3 nodes as input and produces 16 nodes, kernal size 7x7.
-2. 16 nodes as input and produces 32 channels,kernal size 5x5.
-3. 32 nodes as input and 64 nodes as output, kernal size 5x5.
-4. 64 nodes as input and 128 nodes as output, kernal size 5x5. 
-
-Between two conv layer I applied max pooling layer of 2x2 to reduce the dimension and conserve the path.
-
-After that, I flatted the image to use it in the linear layer. I created one and an output layer. I have dropout of 50%
+__Answer:__ First of all, I used a conv layer which will have 3 channels and to produce 32 channels from these 3 which has kernal size 3x3 and stride of 2 and padding of 1 on edges. Next I have taken a conv layer which will have 32  channels and to produce 64 channels with kernal size 3x3 and stride of 2 and padding of 1 on edges. Next I used a conv layer which had 64 as input channels and 128 channels as output with kernal size 3x3. Between two conv layer I applied max pooling layer of 2x2 to reduce the dimension and conserve the path. After that, I flatted the image to use it in the linear layer. I created one and an output layer. I have dropout of 30%
 
 
 ```python
@@ -613,7 +596,7 @@ import torch.optim as optim
 criterion_scratch = torch.nn.CrossEntropyLoss()
 
 ### TODO: select optimizer
-optimizer_scratch = optim.SGD(model_scratch.parameters(), lr=0.01)
+optimizer_scratch = optim.SGD(model_scratch.parameters(), lr=0.005)
 ```
 
 
@@ -624,7 +607,7 @@ model_scratch.parameters()
 
 
 
-    <generator object Module.parameters at 0x7fc37b48d1a8>
+    <generator object Module.parameters at 0x7f3256291eb8>
 
 
 
@@ -705,60 +688,80 @@ def train(n_epochs,loader, model, optimizer, criterion, use_cuda, save_path):
 
 ```python
 # train the model
-model_scratch = train(10,dataloaders, model_scratch, optimizer_scratch, 
+model_scratch = train(40,dataloaders, model_scratch, optimizer_scratch, 
                       criterion_scratch, use_cuda, 'model_scratch.pt')
 
 # load the model that got the best validation accuracy
 model_scratch.load_state_dict(torch.load('model_scratch.pt'))
 ```
 
-    Epoch: 1 	Training Loss: 4.890185 	Validation Loss: 4.888662
-    saving model at 4.888662
-    Epoch: 2 	Training Loss: 4.887807 	Validation Loss: 4.885588
-    saving model at 4.885588
-    Epoch: 3 	Training Loss: 4.881742 	Validation Loss: 4.873942
-    saving model at 4.873942
-    Epoch: 4 	Training Loss: 4.873007 	Validation Loss: 4.866253
-    saving model at 4.866253
-    Epoch: 5 	Training Loss: 4.869701 	Validation Loss: 4.864642
-    saving model at 4.864642
-    Epoch: 6 	Training Loss: 4.866576 	Validation Loss: 4.861816
-    saving model at 4.861816
-    Epoch: 7 	Training Loss: 4.862321 	Validation Loss: 4.860617
-    saving model at 4.860617
-    Epoch: 8 	Training Loss: 4.861203 	Validation Loss: 4.853935
-    saving model at 4.853935
-    Epoch: 9 	Training Loss: 4.857044 	Validation Loss: 4.848789
-    saving model at 4.848789
-    Epoch: 10 	Training Loss: 4.850196 	Validation Loss: 4.835593
-    saving model at 4.835593
-    
-
-
-
-
-    <All keys matched successfully>
-
-
-
-    Epoch: 1 	Training Loss: 4.889772 	Validation Loss: 4.888443
-    saving model at 4.888443
-    Epoch: 2 	Training Loss: 4.887676 	Validation Loss: 4.886302
-    saving model at 4.886302
-    Epoch: 3 	Training Loss: 4.883247 	Validation Loss: 4.878076
-    saving model at 4.878076
-    Epoch: 4 	Training Loss: 4.877048 	Validation Loss: 4.868307
-    saving model at 4.868307
-    Epoch: 5 	Training Loss: 4.869829 	Validation Loss: 4.865761
-    saving model at 4.865761
-    Epoch: 6 	Training Loss: 4.865781 	Validation Loss: 4.857919
-    saving model at 4.857919
-    Epoch: 7 	Training Loss: 4.861726 	Validation Loss: 4.859887
-    Epoch: 8 	Training Loss: 4.855153 	Validation Loss: 4.842596
-    saving model at 4.842596
-    Epoch: 9 	Training Loss: 4.845404 	Validation Loss: 4.825605
-    saving model at 4.825605
-    Epoch: 10 	Training Loss: 4.831961 	Validation Loss: 4.835938
+    Epoch: 1 	Training Loss: 4.381835 	Validation Loss: 4.226861
+    saving model at 4.226861
+    Epoch: 2 	Training Loss: 4.353202 	Validation Loss: 4.210059
+    saving model at 4.210059
+    Epoch: 3 	Training Loss: 4.339722 	Validation Loss: 4.168432
+    saving model at 4.168432
+    Epoch: 4 	Training Loss: 4.335600 	Validation Loss: 4.186110
+    Epoch: 5 	Training Loss: 4.324399 	Validation Loss: 4.173935
+    Epoch: 6 	Training Loss: 4.303563 	Validation Loss: 4.133448
+    saving model at 4.133448
+    Epoch: 7 	Training Loss: 4.303438 	Validation Loss: 4.127139
+    saving model at 4.127139
+    Epoch: 8 	Training Loss: 4.307861 	Validation Loss: 4.125581
+    saving model at 4.125581
+    Epoch: 9 	Training Loss: 4.285603 	Validation Loss: 4.126941
+    Epoch: 10 	Training Loss: 4.277150 	Validation Loss: 4.101574
+    saving model at 4.101574
+    Epoch: 11 	Training Loss: 4.276585 	Validation Loss: 4.100449
+    saving model at 4.100449
+    Epoch: 12 	Training Loss: 4.264725 	Validation Loss: 4.080644
+    saving model at 4.080644
+    Epoch: 13 	Training Loss: 4.267755 	Validation Loss: 4.073404
+    saving model at 4.073404
+    Epoch: 14 	Training Loss: 4.237756 	Validation Loss: 4.109478
+    Epoch: 15 	Training Loss: 4.245515 	Validation Loss: 4.055350
+    saving model at 4.055350
+    Epoch: 16 	Training Loss: 4.234472 	Validation Loss: 4.047134
+    saving model at 4.047134
+    Epoch: 17 	Training Loss: 4.226061 	Validation Loss: 4.036149
+    saving model at 4.036149
+    Epoch: 18 	Training Loss: 4.214043 	Validation Loss: 4.030338
+    saving model at 4.030338
+    Epoch: 19 	Training Loss: 4.204076 	Validation Loss: 4.023715
+    saving model at 4.023715
+    Epoch: 20 	Training Loss: 4.176564 	Validation Loss: 4.024560
+    Epoch: 21 	Training Loss: 4.189395 	Validation Loss: 4.006196
+    saving model at 4.006196
+    Epoch: 22 	Training Loss: 4.174748 	Validation Loss: 3.974464
+    saving model at 3.974464
+    Epoch: 23 	Training Loss: 4.173184 	Validation Loss: 3.975855
+    Epoch: 24 	Training Loss: 4.163493 	Validation Loss: 3.983258
+    Epoch: 25 	Training Loss: 4.166717 	Validation Loss: 4.015851
+    Epoch: 26 	Training Loss: 4.153632 	Validation Loss: 3.962084
+    saving model at 3.962084
+    Epoch: 27 	Training Loss: 4.146798 	Validation Loss: 3.970952
+    Epoch: 28 	Training Loss: 4.128376 	Validation Loss: 3.940912
+    saving model at 3.940912
+    Epoch: 29 	Training Loss: 4.126681 	Validation Loss: 3.940168
+    saving model at 3.940168
+    Epoch: 30 	Training Loss: 4.130209 	Validation Loss: 3.933434
+    saving model at 3.933434
+    Epoch: 31 	Training Loss: 4.114749 	Validation Loss: 3.914106
+    saving model at 3.914106
+    Epoch: 32 	Training Loss: 4.106935 	Validation Loss: 3.940560
+    Epoch: 33 	Training Loss: 4.100235 	Validation Loss: 3.911395
+    saving model at 3.911395
+    Epoch: 34 	Training Loss: 4.071439 	Validation Loss: 3.894482
+    saving model at 3.894482
+    Epoch: 35 	Training Loss: 4.069384 	Validation Loss: 3.894918
+    Epoch: 36 	Training Loss: 4.068764 	Validation Loss: 3.876770
+    saving model at 3.876770
+    Epoch: 37 	Training Loss: 4.062003 	Validation Loss: 3.867345
+    saving model at 3.867345
+    Epoch: 38 	Training Loss: 4.051757 	Validation Loss: 3.853825
+    saving model at 3.853825
+    Epoch: 39 	Training Loss: 4.046158 	Validation Loss: 3.880884
+    Epoch: 40 	Training Loss: 4.039592 	Validation Loss: 3.903987
     
 
 
@@ -812,14 +815,10 @@ def test(loaders, model, criterion, use_cuda):
 test(dataloaders, model_scratch, criterion_scratch, use_cuda)
 ```
 
-    Test Loss: 4.822695
+    Test Loss: 3.854607
     
     
-    Test Accuracy:  1% (10/836)
-    Test Loss: 4.809472
-    
-    
-    Test Accuracy:  1% (11/836)
+    Test Accuracy: 11% (99/836)
     
 
 ---
@@ -854,57 +853,6 @@ if use_cuda:
 ```python
 model_transfer
 ```
-
-
-
-
-    VGG(
-      (features): Sequential(
-        (0): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (1): ReLU(inplace=True)
-        (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (3): ReLU(inplace=True)
-        (4): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-        (5): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (6): ReLU(inplace=True)
-        (7): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (8): ReLU(inplace=True)
-        (9): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-        (10): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (11): ReLU(inplace=True)
-        (12): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (13): ReLU(inplace=True)
-        (14): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (15): ReLU(inplace=True)
-        (16): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-        (17): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (18): ReLU(inplace=True)
-        (19): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (20): ReLU(inplace=True)
-        (21): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (22): ReLU(inplace=True)
-        (23): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-        (24): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (25): ReLU(inplace=True)
-        (26): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (27): ReLU(inplace=True)
-        (28): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (29): ReLU(inplace=True)
-        (30): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-      )
-      (avgpool): AdaptiveAvgPool2d(output_size=(7, 7))
-      (classifier): Sequential(
-        (0): Linear(in_features=25088, out_features=4096, bias=True)
-        (1): ReLU(inplace=True)
-        (2): Dropout(p=0.5, inplace=False)
-        (3): Linear(in_features=4096, out_features=4096, bias=True)
-        (4): ReLU(inplace=True)
-        (5): Dropout(p=0.5, inplace=False)
-        (6): Linear(in_features=4096, out_features=1000, bias=True)
-      )
-    )
-
-
 
 
 
@@ -1024,54 +972,6 @@ model_transfer
 
 
 
-
-
-
-    VGG(
-      (features): Sequential(
-        (0): Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (1): ReLU(inplace=True)
-        (2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (3): ReLU(inplace=True)
-        (4): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-        (5): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (6): ReLU(inplace=True)
-        (7): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (8): ReLU(inplace=True)
-        (9): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-        (10): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (11): ReLU(inplace=True)
-        (12): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (13): ReLU(inplace=True)
-        (14): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (15): ReLU(inplace=True)
-        (16): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-        (17): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (18): ReLU(inplace=True)
-        (19): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (20): ReLU(inplace=True)
-        (21): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (22): ReLU(inplace=True)
-        (23): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-        (24): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (25): ReLU(inplace=True)
-        (26): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (27): ReLU(inplace=True)
-        (28): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))
-        (29): ReLU(inplace=True)
-        (30): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
-      )
-      (avgpool): AdaptiveAvgPool2d(output_size=(7, 7))
-      (classifier): Sequential(
-        (0): Linear(in_features=25088, out_features=5000, bias=True)
-        (1): ReLU(inplace=True)
-        (2): Dropout(p=0.2, inplace=False)
-        (3): Linear(in_features=5000, out_features=133, bias=True)
-      )
-    )
-
-
-
 __Question 5:__ Outline the steps you took to get to your final CNN architecture and your reasoning at each step.  Describe why you think the architecture is suitable for the current problem.
 
 __Answer:__    I have taken conv layers from the previous model and changed the fully connected layers from input 25088 and second layer of 5000 nodes just as random and applied relu activation function for the output from first layer after that I have added dropout of nodes of 20% and at last I have again taken hidden layer to output layer from 5000 to 133.
@@ -1101,51 +1001,29 @@ model_transfer.cuda()
 model_transfer =  train(10, dataloaders, model_transfer, optimizer_transfer, criterion_transfer, use_cuda, 'model_transfer.pt')
 ```
 
-    Epoch: 1 	Training Loss: 3.293755 	Validation Loss: 1.414878
-    saving model at 1.414878
-    Epoch: 2 	Training Loss: 2.012828 	Validation Loss: 1.331384
-    saving model at 1.331384
-    Epoch: 3 	Training Loss: 1.635895 	Validation Loss: 0.912503
-    saving model at 0.912503
-    Epoch: 4 	Training Loss: 1.425394 	Validation Loss: 1.030154
-    Epoch: 5 	Training Loss: 1.319445 	Validation Loss: 0.943130
-    Epoch: 6 	Training Loss: 1.226337 	Validation Loss: 0.912712
-    Epoch: 7 	Training Loss: 1.150156 	Validation Loss: 0.895962
-    saving model at 0.895962
-    Epoch: 8 	Training Loss: 1.086229 	Validation Loss: 0.956393
-    Epoch: 9 	Training Loss: 1.002239 	Validation Loss: 0.739419
-    saving model at 0.739419
-    Epoch: 10 	Training Loss: 0.994259 	Validation Loss: 0.766202
-    Epoch: 1 	Training Loss: 3.280551 	Validation Loss: 1.649490
-    saving model at 1.649490
-    Epoch: 2 	Training Loss: 2.040149 	Validation Loss: 1.198786
-    saving model at 1.198786
-    Epoch: 3 	Training Loss: 1.646721 	Validation Loss: 0.966548
-    saving model at 0.966548
-    Epoch: 4 	Training Loss: 1.457012 	Validation Loss: 0.834392
-    saving model at 0.834392
-    Epoch: 5 	Training Loss: 1.317776 	Validation Loss: 0.790898
-    saving model at 0.790898
-    Epoch: 6 	Training Loss: 1.232949 	Validation Loss: 0.910912
-    Epoch: 7 	Training Loss: 1.130424 	Validation Loss: 0.800941
-    Epoch: 8 	Training Loss: 1.095892 	Validation Loss: 0.728674
-    saving model at 0.728674
-    Epoch: 9 	Training Loss: 1.042333 	Validation Loss: 0.733703
-    Epoch: 10 	Training Loss: 0.976759 	Validation Loss: 0.721558
-    saving model at 0.721558
+    Epoch: 1 	Training Loss: 3.253770 	Validation Loss: 1.615277
+    saving model at 1.615277
+    Epoch: 2 	Training Loss: 1.994279 	Validation Loss: 1.199997
+    saving model at 1.199997
+    Epoch: 3 	Training Loss: 1.639405 	Validation Loss: 0.998808
+    saving model at 0.998808
+    Epoch: 4 	Training Loss: 1.436971 	Validation Loss: 0.879326
+    saving model at 0.879326
+    Epoch: 5 	Training Loss: 1.292220 	Validation Loss: 0.779893
+    saving model at 0.779893
+    Epoch: 6 	Training Loss: 1.237126 	Validation Loss: 0.803184
+    Epoch: 7 	Training Loss: 1.165740 	Validation Loss: 0.697565
+    saving model at 0.697565
+    Epoch: 8 	Training Loss: 1.098027 	Validation Loss: 0.878474
+    Epoch: 9 	Training Loss: 1.049765 	Validation Loss: 0.689785
+    saving model at 0.689785
+    Epoch: 10 	Training Loss: 0.951245 	Validation Loss: 0.771701
     
 
 
 ```python
 model_transfer.load_state_dict(torch.load('model_transfer.pt'))
 ```
-
-
-
-
-    <All keys matched successfully>
-
-
 
 
 
@@ -1164,14 +1042,10 @@ model_transfer.cuda()
 test(dataloaders, model_transfer, criterion_transfer, use_cuda)
 ```
 
-    Test Loss: 0.793795
+    Test Loss: 0.749363
     
     
-    Test Accuracy: 77% (652/836)
-    Test Loss: 0.753176
-    
-    
-    Test Accuracy: 79% (665/836)
+    Test Accuracy: 77% (649/836)
     
 
 ### (IMPLEMENTATION) Predict Dog Breed with the Model
@@ -1207,13 +1081,6 @@ def predict_breed_transfer(img_path):
 ```python
 predict_breed_transfer(dog_files[0])
 ```
-
-
-
-
-    'Afghan hound'
-
-
 
 
 
@@ -1275,7 +1142,7 @@ Test your algorithm at least six images on your computer.  Feel free to use any 
 
 __Question 6:__ Is the output better than you expected :) ?  Or worse :( ?  Provide at least three possible points of improvement for your algorithm.
 
-__Answer:__ The output of Transfer learning is much more better than the one I designed. I can improve the architecture of my model by changing the number of convolutional layers and the neurons per each layer. I can also add more linear layers.
+__Answer:__ (Three possible points for improvement)
 
 
 ```python
@@ -1298,11 +1165,11 @@ for file in np.hstack((human_files[:3], dog_files[:3])):
     lfw/Rod_Stewart/Rod_Stewart_0001.jpg
     Hello, Human!
     You look like a...
-    Poodle
+    Welsh springer spaniel
     lfw/Rod_Stewart/Rod_Stewart_0002.jpg
     Hello, Human!
     You look like a...
-    Chinese crested
+    Welsh springer spaniel
     lfw/Rod_Stewart/Rod_Stewart_0003.jpg
     Hello, Human!
     You look like a...
